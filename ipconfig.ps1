@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 
-# Liest IPv4-Adresse, Subnetzmaske und Gateway vom Benutzer ein und setzt diese
-# auf der einzigen aktiven Netzwerkschnittstelle des Systems.
+# Liest IPv4-Adresse, Subnetzmaske, Gateway sowie DNS-Server vom Benutzer ein
+# und setzt diese auf der einzigen aktiven Netzwerkschnittstelle des Systems.
 
 function Read-IPv4Address {
     [CmdletBinding()]
@@ -26,6 +26,50 @@ function Read-IPv4Address {
 
         # Hinweis, falls die Eingabe kein valides IPv4-Format hat.
         Write-Warning "Bitte eine gültige IPv4-Adresse eingeben (z.B. 192.168.178.10)."
+    }
+}
+
+function Read-IPv4AddressList {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Prompt
+    )
+
+    while ($true) {
+        $value = Read-Host $Prompt
+
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            Write-Warning "Eingabe darf nicht leer sein."
+            continue
+        }
+
+        $entries = $value.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries) |
+            ForEach-Object { $_.Trim() }
+
+        if ($entries.Count -eq 0) {
+            Write-Warning "Mindestens einen DNS-Server angeben."
+            continue
+        }
+
+        $result = @()
+        $allValid = $true
+
+        foreach ($entry in $entries) {
+            $parsedIp = $null
+            if ([System.Net.IPAddress]::TryParse($entry, [ref]$parsedIp) -and
+                $parsedIp.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) {
+                $result += $parsedIp.IPAddressToString
+            } else {
+                $allValid = $false
+                Write-Warning "Ungültiger DNS-Server '$entry'. Bitte IPv4 verwenden."
+                break
+            }
+        }
+
+        if ($allValid) {
+            return ,$result
+        }
     }
 }
 
@@ -63,6 +107,7 @@ function Convert-SubnetMaskToPrefixLength {
 $ipAddress = Read-IPv4Address -Prompt "IPv4-Adresse eingeben"
 $subnetMask = Read-IPv4Address -Prompt "Subnetzmaske eingeben"
 $gateway = Read-IPv4Address -Prompt "Standardgateway eingeben"
+$dnsServers = Read-IPv4AddressList -Prompt "DNS-Server eingeben (kommagetrennt, mindestens einer)"
 
 try {
     # Prefixlänge aus der Subnetzmaske berechnen.
@@ -101,6 +146,11 @@ try {
         -DefaultGateway $gateway `
         -AddressFamily IPv4 `
         -ErrorAction Stop | Out-Null
+
+    # DNS-Server setzen (ersetzt vorhandene Einträge).
+    Set-DnsClientServerAddress -InterfaceIndex $adapter.IfIndex `
+        -ServerAddresses $dnsServers `
+        -ErrorAction Stop
 
     Write-Host "IP-Konfiguration erfolgreich aktualisiert." -ForegroundColor Green
 } catch {
