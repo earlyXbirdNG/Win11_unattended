@@ -1,6 +1,6 @@
 #Requires -RunAsAdministrator
 
-# Skript zum Joinen einer Windows-Installation an die Domäne contoso.local.
+# .Skript zum Joinen einer Windows-Installation an die Domäne contoso.local.
 # Fragt Benutzername und Kennwort ab, erstellt entsprechende Credentials und
 # führt anschließend den Domain Join aus. Ein Neustart wird bewusst nicht
 # ausgelöst, damit das Skript während des Unattended-Setups sicher läuft.
